@@ -4,7 +4,11 @@ Wise importer for Beancount
 Gets transactions from the Wise (formerly TransferWise) API 
 and maps them to Beancount transactions.
 
-Grabs transactions for all currencies.
+Supports:
+
+- Multiple profiles (e.g. personal and business)
+- Multiple currencies (grabs all)
+- Separate postings for transfer fees
 
 ## Setup
 
@@ -30,6 +34,9 @@ profiles:
     account: Assets:Wise:FooAccount
   '90123456':
     account: Assets:Wise:BarAccount
+
+# Optional: account to put transfer fees on
+feesAccount: Expenses:Fees:WireTransfer
 ```
 
 Then, in your Beancount importer config file:

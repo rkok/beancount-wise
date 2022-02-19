@@ -74,6 +74,34 @@ class Importer(importer.ImporterProtocol):
                         "ref": transaction["referenceNumber"],
                     }
                     meta = data.new_metadata("", 0, metakv)
+
+                    postings = [
+                        data.Posting(
+                            profileCfg["account"],
+                            amount.Amount(
+                                D(str(transaction["amount"]["value"])),
+                                transaction["amount"]["currency"],
+                            ),
+                            None,
+                            None,
+                            None,
+                            None,
+                        ),
+                    ]
+
+                    if config["feesAccount"] is not None and transaction["totalFees"]["value"] > 0:
+                        postings.append(data.Posting(
+                            config["feesAccount"],
+                            amount.Amount(
+                                D(str(transaction["totalFees"]["value"])),
+                                transaction["totalFees"]["currency"],
+                            ),
+                            None,
+                            None,
+                            None,
+                            None,
+                        ))
+
                     entry = data.Transaction(
                         meta,
                         dateutil.parser.parse(transaction["date"]).date(),
@@ -82,19 +110,7 @@ class Importer(importer.ImporterProtocol):
                         transaction["details"]["description"],
                         data.EMPTY_SET,
                         data.EMPTY_SET,
-                        [
-                            data.Posting(
-                                profileCfg["account"],
-                                amount.Amount(
-                                    D(str(transaction["amount"]["value"])),
-                                    transaction["amount"]["currency"],
-                                ),
-                                None,
-                                None,
-                                None,
-                                None,
-                            ),
-                        ],
+                        postings,
                     )
                     entries.append(entry)
 
