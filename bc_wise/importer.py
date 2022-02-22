@@ -74,26 +74,74 @@ class Importer(importer.ImporterProtocol):
                         "ref": transaction["referenceNumber"],
                     }
                     meta = data.new_metadata("", 0, metakv)
+                    debitCredit = (-1 if transaction["type"] == "DEBIT" else 1)
 
-                    postings = [
-                        data.Posting(
-                            profileCfg["account"],
-                            amount.Amount(
-                                D(str(transaction["amount"]["value"])),
-                                transaction["amount"]["currency"],
+                    # Main postings
+                    # If there was a currency exchange, alter the posting accordingly
+                    if transaction["exchangeDetails"] is not None:
+                        exchange = transaction["exchangeDetails"]
+                        fromAmount = D(str(exchange["fromAmount"]["value"]))
+
+                        # Recalculate the exchange rate, because the one reported by Wise is not precisely accurate,
+                        # and Beancount would complain about this
+                        correctedExchangeRate = D(str(exchange["toAmount"]["value"])) / fromAmount
+                        # D(str(exchange["rate"])), # <-- The inaccurate rate
+
+                        postings = [
+                            # Post the fromAmount of the exchange (= excluding transfer fee)
+                            data.Posting(
+                                profileCfg["account"],
+                                amount.Amount(
+                                    fromAmount * debitCredit,
+                                    exchange["fromAmount"]["currency"],
+                                ),
+                                None,
+                                amount.Amount(
+                                    correctedExchangeRate,
+                                    exchange["toAmount"]["currency"],
+                                ),
+                                None,
+                                None,
                             ),
-                            None,
-                            None,
-                            None,
-                            None,
-                        ),
-                    ]
+                        ]
 
+                        # Now post the credited/debited transfer fee
+                        if transaction["totalFees"]["value"] > 0:
+                            postings.append(
+                                data.Posting(
+                                    profileCfg["account"],
+                                    amount.Amount(
+                                        D(str(transaction["totalFees"]["value"])) * debitCredit,
+                                        transaction["totalFees"]["currency"],
+                                    ),
+                                    None,
+                                    None,
+                                    None,
+                                    None
+                                )
+                            )
+                    else:
+                        # Post the main amount, including the possible transfer fee
+                        postings = [
+                            data.Posting(
+                                profileCfg["account"],
+                                amount.Amount(
+                                    D(str(transaction["amount"]["value"])),
+                                    transaction["amount"]["currency"],
+                                ),
+                                None,
+                                None,
+                                None,
+                                None,
+                            )
+                        ]
+
+                    # Post the transfer fee to the fees account if configured
                     if config["feesAccount"] is not None and transaction["totalFees"]["value"] > 0:
                         postings.append(data.Posting(
                             config["feesAccount"],
                             amount.Amount(
-                                D(str(transaction["totalFees"]["value"])),
+                                D(str(transaction["totalFees"]["value"])) * -debitCredit,
                                 transaction["totalFees"]["currency"],
                             ),
                             None,
