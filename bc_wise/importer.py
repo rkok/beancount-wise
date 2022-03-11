@@ -82,11 +82,6 @@ class Importer(importer.ImporterProtocol):
                         exchange = transaction["exchangeDetails"]
                         fromAmount = D(str(exchange["fromAmount"]["value"]))
 
-                        # Recalculate the exchange rate, because the one reported by Wise is not precisely accurate,
-                        # and Beancount would complain about this
-                        correctedExchangeRate = D(str(exchange["toAmount"]["value"])) / fromAmount
-                        # D(str(exchange["rate"])), # <-- The inaccurate rate
-
                         postings = [
                             # Post the fromAmount of the exchange (= excluding transfer fee)
                             data.Posting(
@@ -97,7 +92,7 @@ class Importer(importer.ImporterProtocol):
                                 ),
                                 None,
                                 amount.Amount(
-                                    correctedExchangeRate,
+                                    D(str(exchange["rate"])),
                                     exchange["toAmount"]["currency"],
                                 ),
                                 None,
@@ -105,6 +100,24 @@ class Importer(importer.ImporterProtocol):
                             ),
                         ]
 
+                        # Wise almost always takes/leaves 'dust' when converting between currencies
+                        # Beancount will (appropriately) warn about this, so track this dust in a separate account
+                        convDiff = D(str(exchange["toAmount"]["value"])) - D(str(exchange["fromAmount"]["value"])) * D(str(exchange["rate"]))
+                        if convDiff != 0:
+                            postings.append(
+                                data.Posting(
+                                    "Equity:Wise:ConversionDifference",
+                                    amount.Amount(
+                                        -convDiff,
+                                        exchange["toAmount"]["currency"],
+                                    ),
+                                    None,
+                                    None,
+                                    None,
+                                    None
+                                )
+                            )
+                            
                         # Now post the credited/debited transfer fee
                         if transaction["totalFees"]["value"] > 0:
                             postings.append(

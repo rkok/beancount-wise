@@ -61,6 +61,12 @@ CONFIG = [
 bean-extract -e ledger.beancount config.py .
 ```
 
+## Notes
+
+Wise almost always takes/leaves 'dust' when converting between currencies.
+Beancount will (appropriately) warn about this, 
+so we track this dust in a separate account called Equity:Wise:ConversionDifference
+
 ## Thanks
 
 This was based on the (no longer working) Transferwise importer from [tariochbctools](https://github.com/tarioch/beancounttools)
